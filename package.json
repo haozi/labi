@@ -1,0 +1,26 @@
+{
+  "name": "labi",
+  "version": "0.0.0",
+  "description": "",
+  "main": "lib/index.js",
+  "devDependencies": {
+    "babel-cli": "6.x.x",
+    "babel-preset-env": "*"
+  },
+  "scripts": {
+    "dev": "npm run watch-build",
+    "copy": "rm -rf lib && cp -r src lib",
+    "build": "npm run lint && npm run copy && babel  src/ --out-dir lib/ --source-maps inline",
+    "watch-build": "npm run build -- --watch",
+    "watch": "npm run watch-build",
+    "lint": "standard 'src/**/**.js' --fix",
+    "prepublish": "npm run lint && npm run build",
+    "test": "babel-node test/index.js",
+    "test:devtools": "devtool -r babel-register test/index.js"
+  },
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "fluent-ffmpeg": "^2.1.2"
+  }
+}
