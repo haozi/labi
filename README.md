@@ -1,11 +1,20 @@
-# <%=name%>
+# labi
+---
 
-## 开发
+## demo
+```
+import labi from 'labi'
 
-```sh
-  npm run dev
+labi.transform({
+  src: '',
+  dest: '',
+  fomart: 'mp4',
+  size: '100x900',
+  videoCodec: 'libx264',
+  audioCodec: 'libmp3lame'
+}).then(() => {
+	
+})
 ```
-## 构建
-```sh
-  npm run build
-```
+
+## API
