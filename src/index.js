@@ -1,20 +1,24 @@
-import { logger, runBash } from './util'
+import { logger, runBash, unique, base64, promisify, stringify as S } from './util'
 import path from 'path'
+import fs from 'fs'
 
 const DEFAULTS = {
   root: '',
   src: '',
   dest: '',
-  tmpPath: '',
-  size: '750x560',
+  size: '750x422',
+  stringify: false,
+  zip: true,
+  mute: false
 }
 
 let uuid = 0
 
 class Labi {
   constructor (config) {
-    this.shell = []
     this.config = this._getConfig(config)
+    this.timer = 0
+    this.tmpPath = []
   }
 
   _getConfig (config) {
@@ -26,60 +30,90 @@ class Labi {
       config.root = process.cwd()
     }
 
-    // config.tmpPath = path.resolve(config.root, `_${++uuid}`, `${config.dest}`)
-
     'src,dest'.split(',').forEach(k => {
       config[k] = path.resolve(config.root, config[k])
     })
-    logger.info(config.tmpPath)
     return config
   }
 
-  _joinShell (shell) {
-    this.shell.push(shell)
-  }
-
-  get src () {
+  getSrc (update) {
     if (!uuid) {
-      ++uuid
       return this.config.src
     }
-    return this.config.src + uuid++
-  }
-
-  get dest () {
     --uuid
-    return this.src
+    return this.getDest()
   }
 
-  sh (sh) {
+  getDest (noUpdate) {
+    let tmpDest = `${this.config.dest}~${noUpdate ? --uuid : uuid++}${path.extname(this.config.dest)}`
+    this.tmpPath.push(tmpDest)
+    return tmpDest
+  }
+
+  _sh (shell) {
+    if (Array.isArray(shell)) {
+      shell = shell.join(' && ')
+    }
+    shell = String(shell).trim()
     logger.info(
-      '```' + '\n' +
-        sh + '\n' +
+      '```shell' + '\n' +
+        shell.split(/\s+&&\s+/).join(' &&\n') + '\n' +
       '```'
     )
-    return runBash(sh)
+    if (!shell) return
+    process.chdir(this.config.root)
+    return runBash(shell)
   }
 
-  zip () { // 压缩
-    const shell = `ffmpeg -i ${this.src} -s ${this.config.size} ${this.dest}`
-    logger.info(shell)
-    this._joinShell(shell)
-    return this
+  /**
+   * 压缩
+   */
+  async _zip ({size} = {}) {
+    const shell = `ffmpeg -i ${S(this.getSrc())} -s ${S(size || this.config.size)} ${S(this.getDest())} #zip`
+    await this._sh(shell)
   }
 
-  mute () { // 消音
-    const shell = `ffmpeg -i ${this.src} -vcodec copy -an ${this.dest}`
-    this._joinShell(shell)
-    logger.info(shell)
-    return this
+  /**
+   * 消音
+   */
+  async _mute () {
+    const shell = `ffmpeg -i ${S(this.getSrc())} -vcodec copy -an ${S(this.getDest())} #mute`
+    await this._sh(shell)
+  }
+
+  async _stringify () {
+    let str = await base64(this.config.dest)
+    await promisify(fs.writeFile, fs)(this.config.dest + '.js', str, 'utf8')
   }
 
   async draw () {
+    const config = this.config
     try {
-      this.shell.unshift(`rm -rf ${this.config.dest}`)
-      let shell = this.shell.join(';\n')
-      // await this.sh(shell)
+      if (this.timer) {
+        throw new Error('draw() 方法只能调用一次')
+      }
+      ++this.timer
+      await this._sh([
+        `cd ${S(config.root)}`,
+        `rm -rf ${S(config.dest)}*`
+      ])
+
+      config.zip && await this._zip()
+      config.mute && await this._mute()
+
+      await this._sh([
+        `mv ${S(this.getDest(true))} ${S(config.dest)}`,
+        `rm -rf ${unique(this.tmpPath).map(item => S(item)).join(' ')}`
+      ])
+
+      if (config.stringify) {
+        await this._stringify()
+      }
+
+      let ret = Object.assign({}, config)
+      ret.destString = config.dest + '.js'
+      return ret
+
     } catch (e) {
       logger.error(e)
     }

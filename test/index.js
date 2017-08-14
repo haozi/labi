@@ -10,11 +10,10 @@ import labi from '../src/index'
 // }).run()
 
 labi({
-  src: './test/f.mp4',
-  dest: './test/output.mp4'
+  src: './test/input.mp4',
+  dest: './test/output.mp4',
+  size: '300x156',
+  mute: true,
+}).draw().then(e => {
+  console.log(e)
 })
-.zip()
-.mute()
-.draw()
-
-// 12.6M

@@ -22,6 +22,7 @@
   "license": "MIT",
   "dependencies": {
     "colors": "^1.1.2",
+    "datauri": "^1.0.5",
     "fluent-ffmpeg": "^2.1.2"
   }
 }

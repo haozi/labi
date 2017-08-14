@@ -15,5 +15,4 @@ lib
 .vscode-upload.json
 
 
-test/o.mp4
-test/f.mp4
+test/output.mp4
