@@ -14,5 +14,6 @@ lib
 .vscode
 .vscode-upload.json
 
+test/input.mkv
+test/output.*
 
-test/output.mp4

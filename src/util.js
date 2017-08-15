@@ -1,6 +1,8 @@
 import childProcess from 'child_process'
 import colors from 'colors/safe'
 import datauri from 'datauri'
+import fs from 'fs'
+import zlib from 'zlib'
 
 export function runBash (bash, options = {}) {
   bash = String(bash).trim() + '\n'
@@ -26,6 +28,10 @@ export const logger = {
 
   info (s) {
     console.log(colors.green(s))
+  },
+
+  warn (s) {
+    console.warn(colors.yellow(s))
   },
 
   error (s) {
@@ -59,5 +65,46 @@ export function stringify (str) {
   return str
 }
 
+export function gzip ({code, path}) {
+  return new Promise((resolve, reject) => {
+    fs.readFile(path, (err, buf) => {
+      if (err) return reject(err)
+      zlib.gzip(buf, (err, buf) => {
+        if (err) return reject(err)
+        resolve(buf)
+      })
+    })
+  })
+}
 
+export function getSize ({code, path}) {
+  let byte
+  if (path) {
+    byte = fs.statSync(path).size
+  } else {
+    byte = code.length
+  }
+  let ret = {
+    s: byte + ' B',
+    r: byte
+  }
+  if (byte >= 1024) {
+    ret.s = +(byte / 1024).toFixed() + ' KB'
+  }
+
+  if (byte >= 1024 ** 2) {
+    ret.s = +(byte / 1024 ** 2).toFixed(1) + ' MB'
+  }
+
+  if (byte >= 1024 ** 3) {
+    ret.s = +(byte / 1024 ** 3).toFixed(2) + ' GB'
+  }
+  return ret
+}
+
+export function sleep (delay) {
+  return new Promise(resolve => {
+    setTimeout(resolve, delay * 1000)
+  })
+}
 

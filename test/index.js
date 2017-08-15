@@ -12,8 +12,15 @@ import labi from '../src/index'
 labi({
   src: './test/input.mp4',
   dest: './test/output.mp4',
-  size: '300x156',
+  size: '750x422',
+  cut: [{
+    start: '00:00:45',
+    duration: 5
+  }],
   mute: true,
-}).draw().then(e => {
+  stringify: true
+})//._result()
+.draw().then(e => {
   console.log(e)
 })
+
