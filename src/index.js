@@ -3,6 +3,7 @@ import path from 'path'
 import fs from 'fs'
 import Table from 'cli-table'
 import colors from 'colors/safe'
+import './global'
 
 const DEFAULTS = {
   root: '',
@@ -43,9 +44,8 @@ class Labi {
   }
 
   getSrc (update) {
-    if (!uuid) {
-      return this.config.src
-    }
+    if (!uuid) return this.config.src
+
     --uuid
     return this.getDest()
   }
@@ -61,7 +61,8 @@ class Labi {
       shell = shell.join(' && ')
     }
     shell = String(shell).trim()
-    logger.info(
+
+    global.isDebug && logger.info(
       '```shell' + '\n' +
         shell.split(/\s+&&\s+/).join(' &&\n') + '\n' +
       '```'
@@ -116,7 +117,6 @@ class Labi {
       this._sh(`echo 'file ${(split)}' >> ${S(text)}`)
     })
     await Promise.all(promiseSplit)
-    // await this._sh(`ffmpeg -i 'concat:${inputFile.join('|')}' -codec copy ${S(dest)} #concat`)
     await this._sh(`ffmpeg -f concat -safe 0 -i ${S(text)} -c copy ${S(dest)} #concat`)
   }
 
@@ -164,9 +164,7 @@ class Labi {
     const start = Date.now()
     const config = this.config
     try {
-      if (this.timer) {
-        throw new Error('draw() 方法只能调用一次')
-      }
+      if (this.timer) throw new Error('draw() 方法只能调用一次')
       ++this.timer
       await this._sh([
         `mkdir -p ${this.tmpPath}`,
@@ -194,8 +192,10 @@ class Labi {
           dest: getSize({path: this.config.dest}),
           destStr: getSize({path: this.config.destStr}),
           destStrGzip: getSize({code: await gzip({path: this.config.destStr})})
-        },
-        _config: config
+        }
+      }
+      if (global.isDebug) {
+        ret._config = config
       }
 
       this._result(ret.size)

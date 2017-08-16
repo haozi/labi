@@ -2,8 +2,9 @@
   "presets": [
     ["env", {
       "targets": {
-        "node": 1
+        "node": 8
       }
     }]
-  ]
+  ],
+  "plugins": ["transform-runtime"]
 }

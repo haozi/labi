@@ -3,21 +3,28 @@ import colors from 'colors/safe'
 import datauri from 'datauri'
 import fs from 'fs'
 import zlib from 'zlib'
+import ora from 'ora'
 
 export function runBash (bash, options = {}) {
-  bash = String(bash).trim() + '\n'
+  const tag = bash.split('#')[1] || ''
+  const spinner = ora(tag).start()
+  bash = String(bash).trim()
   return new Promise((resolve, reject) => {
     const p = childProcess.exec(bash, options, (error) => {
       if (error) {
-        console.log(error)
+        logger.error(error)
+        spinner.fail()
         reject(error)
         return
       }
-
+      spinner.succeed()
       resolve()
     })
-    p.stderr.pipe(process.stderr)
-    p.stdout.pipe(process.stdout)
+
+    if (global.isDebug) {
+      p.stderr.pipe(process.stderr)
+      p.stdout.pipe(process.stdout)
+    }
   })
 }
 
