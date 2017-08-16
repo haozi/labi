@@ -18,6 +18,9 @@
     "test": "babel-node test/index.js",
     "test:devtools": "devtool -r babel-register test/index.js"
   },
+  "bin": {
+    "labi": "bin/labi"
+  },
   "author": "",
   "license": "MIT",
   "dependencies": {
