@@ -4,6 +4,7 @@ import datauri from 'datauri'
 import fs from 'fs'
 import zlib from 'zlib'
 import ora from 'ora'
+import imageSize from 'image-size'
 
 export function runBash (bash, options = {}) {
   const tag = bash.split('#')[1] || ''
@@ -109,9 +110,40 @@ export function getSize ({code, path}) {
   return ret
 }
 
+export function getImageSize ({path}) {
+  return imageSize(path)
+}
+
 export function sleep (delay) {
   return new Promise(resolve => {
     setTimeout(resolve, delay * 1000)
   })
 }
 
+export function parseSize (sizeStr, rawSize) {
+  if (typeof sizeStr !== 'string') throw new Error('sizeStr is not a string.')
+
+  let [width = null, height = null] = sizeStr.split(/[x*]/).map(item => {
+    item = item.trim()
+    let ret = +item
+    if (!ret) {
+      ret = item === '0' ? 0 : null
+    }
+    return ret
+  })
+
+  if (width == null || height == null) {
+    if (!rawSize) throw new Error('rawSize is undefined')
+    const {width: rawWidth, height: rawHeight} = parseSize(rawSize)
+    if (width == null) {
+      width = rawWidth * height / rawHeight
+    }
+    if (height === null) {
+      height = width * rawHeight / rawWidth
+    }
+  }
+
+  return {
+    width, height
+  }
+}

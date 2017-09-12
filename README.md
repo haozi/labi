@@ -14,6 +14,11 @@ labi({
   stringify: false, // 是否编译成文本文件，默认 false
   zip: true, // 是否压缩，默认 true
   compareOrigin: true // 是否与原始文件对比，如果比原始文件体积大，使用原始文件
+  watermask: {
+    pic: './test/watermask.png', // 水印图片地址
+    direction: 'ct', tl, tr, br, bl, ct 水印方向， 默认左上解 tl
+    size: '_x40' // 水印大小，默认原始图片尺寸
+  },
   cut: {
     start: '00:50:45',
     duration: 15 // 单位秒
@@ -23,3 +28,4 @@ labi({
 })
 
 ```
+

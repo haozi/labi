@@ -1,15 +1,17 @@
-import { logger, runBash, base64, promisify, gzip, getSize, stringify as S } from './util'
+import { logger, runBash, base64, promisify, gzip, getSize, stringify as S, getImageSize, parseSize } from './util'
 import path from 'path'
 import fs from 'fs'
 import Table from 'cli-table'
 import colors from 'colors/safe'
 import './global'
 
+const isDebug = global.isDebug
 const DEFAULTS = {
   root: '',
   src: '',
   dest: '',
   destStr: '',
+  watermask: null,
   size: '750x422',
   stringify: false,
   zip: true,
@@ -25,6 +27,10 @@ class Labi {
     this.config = this._getConfig(config)
     this.tmpPath = `${process.env.HOME}/.labi/.tmp/${(Math.random() * 1e9).toFixed()}_${Date.now()}`
     this.timer = 0
+  }
+
+  async ffmpeg (shell) {
+    await this._sh(`ffmpeg ${shell}`)
   }
 
   _getConfig (config) {
@@ -58,11 +64,11 @@ class Labi {
 
   _sh (shell) {
     if (Array.isArray(shell)) {
-      shell = shell.join(' && ')
+      shell = shell.filter(Boolean).filter(item => !!String(item).trim()).join(' && ')
     }
     shell = String(shell).trim()
 
-    global.isDebug && logger.info(
+    isDebug && logger.info(
       '```shell' + '\n' +
         shell.split(/\s+&&\s+/).join(' &&\n') + '\n' +
       '```'
@@ -75,14 +81,15 @@ class Labi {
   /**
    * 压缩
    */
-  async _zip ({size} = {}) {
+  async _zip ({size, compareOrigin = false} = {}) {
     const src = this.getSrc()
     const dest = this.getDest()
-    const shell = `ffmpeg -i ${S(src)} -s ${S(size || this.config.size)} ${S(dest)} #zip`
+    const vsize = parseSize(size || this.config.size, '750x422')
+    const shell = `ffmpeg -i ${S(src)} -s ${S(vsize.width + 'x' + vsize.height)} ${S(dest)} #zip`
     await this._sh(shell)
 
     if (
-      this.config.compareOrigin &&
+      compareOrigin &&
       (fs.statSync(dest).size - fs.statSync(src).size > 0)
     ) { // 压缩后体积反而变大
       logger.warn('Greater than the original file')
@@ -93,6 +100,9 @@ class Labi {
     }
   }
 
+  /**
+   * 剪辑
+   */
   async _cut () {
     const src = this.getSrc()
     const dest = this.getDest()
@@ -128,6 +138,29 @@ class Labi {
     await this._sh(shell)
   }
 
+  /**
+   * 加水印
+   * @param {方向 tl, tr, br, bl, ct 默认左上角} direction
+   */
+  async _watermask () {
+    let {direction = 'tl', pic, size} = this.config.watermask || {}
+
+    pic = path.resolve(this.config.root, pic)
+    const rawImgSize = getImageSize({path: pic})
+    const {width: imgWidth, height: imgHeight} = parseSize(size, `${rawImgSize.width}x${rawImgSize.height}`)
+    const overlays = {
+      tl: '0:0',
+      tr: 'main_w-overlay_w:0',
+      br: 'main_w-overlay_w:main_h-overlay_h',
+      bl: '0: main_h-overlay_h',
+      ct: '(main_w-overlay_w)/2:(main_h-overlay_h)/2'
+    }
+
+    const overlay = overlays[direction]
+    const shell = `ffmpeg -i ${S(this.getSrc())} -vf  "movie=${S(pic)},scale=${imgWidth}:${imgHeight}[watermask]; [in] [watermask] overlay=${overlay} [out]" ${S(this.getDest())}`
+    await this._sh(shell)
+  }
+
   async _stringify () {
     let str = await base64(this.config.dest)
     await promisify(fs.writeFile, fs)(this.config.dest + '.js', str, 'utf8')
@@ -154,7 +187,7 @@ class Labi {
       }
       return r.padStart(5) + ' %'
     }
-    console.log(table.toString())
+    logger.log(table.toString())
   }
 
   /**
@@ -167,6 +200,7 @@ class Labi {
       if (this.timer) throw new Error('draw() 方法只能调用一次')
       ++this.timer
       await this._sh([
+        `rm -rf ${this.tmpPath}`,
         `mkdir -p ${this.tmpPath}`,
         `cd ${S(config.root)}`,
         `rm -rf ${S(config.dest)}*`
@@ -175,11 +209,15 @@ class Labi {
       // 先去音轨再压缩，速度能提升 1 倍
       config.cut && await this._cut()
       config.mute && await this._mute()
-      config.zip && await this._zip()
+      if (config.watermask) {
+        await this._zip({compareOrigin: false}) // 不做这一步会使得水印计算不准
+        await this._watermask({direction: this.config.watermask.direction})
+      }
+      config.zip && await this._zip({compareOrigin: this.config.compareOrigin})
 
       await this._sh([
         `mv ${S(this.getDest(true))} ${S(config.dest)}`,
-        `rm -rf ${this.tmpPath}`
+        !isDebug && `rm -rf ${this.tmpPath}`
       ])
 
       if (config.stringify) {
@@ -194,7 +232,7 @@ class Labi {
           destStrGzip: getSize({code: await gzip({path: this.config.destStr})})
         }
       }
-      if (global.isDebug) {
+      if (isDebug) {
         ret._config = config
       }
 
