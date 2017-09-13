@@ -5,7 +5,7 @@ import Table from 'cli-table'
 import colors from 'colors/safe'
 import './global'
 
-const isDebug = global.isDebug
+let isDebug = global.isDebug
 const DEFAULTS = {
   root: '',
   src: '',
@@ -20,13 +20,15 @@ const DEFAULTS = {
   compareOrigin: true // 与原始文件对比，如果比原始文件体积大，使用原始文件
 }
 
-let uuid = 0
-
 class Labi {
   constructor (config) {
+    this.uuid = 0
+    this.timer = 0
     this.config = this._getConfig(config)
     this.tmpPath = `${process.env.HOME}/.labi/.tmp/${(Math.random() * 1e9).toFixed()}_${Date.now()}`
-    this.timer = 0
+
+    config.debug != null && (isDebug = global.isDebug = config.debug)
+    isDebug && (this.tmpPath = `${this.config.root}/_debug`)
   }
 
   async ffmpeg (shell) {
@@ -50,15 +52,15 @@ class Labi {
   }
 
   getSrc (update) {
-    if (!uuid) return this.config.src
+    if (!this.uuid) return this.config.src
 
-    --uuid
+    --this.uuid
     return this.getDest()
   }
 
   getDest (noUpdate) {
     let root = this.tmpPath
-    let tmpDest = `${root}/${noUpdate ? --uuid : uuid++}${path.extname(this.config.dest)}`
+    let tmpDest = `${root}/${noUpdate ? --this.uuid : this.uuid++}${path.extname(this.config.dest)}`
     return tmpDest
   }
 
@@ -162,7 +164,10 @@ class Labi {
   }
 
   async _stringify () {
-    let str = await base64(this.config.dest)
+    let str = (await base64(this.config.dest)).trim()
+    if (this.config.stringify && this.config.stringify.callback) {
+      str = `${this.config.stringify.callback}('${str}')`
+    }
     await promisify(fs.writeFile, fs)(this.config.dest + '.js', str, 'utf8')
   }
 
@@ -172,8 +177,8 @@ class Labi {
     })
 
     table.push(
-      [path.basename(this.config.src), sSrc.s.padStart(8), ''],
-      [path.basename(this.config.dest), sDest.s.padStart(8), `${saved(sDest.r, sSrc.r)}`],
+      [path.basename(this.config.src) + ' (raw)', sSrc.s.padStart(8), ''],
+      [path.basename(this.config.dest) + ' (output)', sDest.s.padStart(8), `${saved(sDest.r, sSrc.r)}`],
       [path.basename(this.config.destStr), sDestStr.s.padStart(8), `${saved(sDestStr.r, sSrc.r)}`],
       [path.basename(this.config.destStr) + colors.cyan(' (gzip)'), sGzipStr.s.padStart(8), `${saved(sGzipStr.r, sSrc.r)}`],
     )
@@ -216,6 +221,7 @@ class Labi {
       config.zip && await this._zip({compareOrigin: this.config.compareOrigin})
 
       await this._sh([
+        `mkdir -p ${S(path.dirname(config.dest))}`,
         `mv ${S(this.getDest(true))} ${S(config.dest)}`,
         !isDebug && `rm -rf ${this.tmpPath}`
       ])
